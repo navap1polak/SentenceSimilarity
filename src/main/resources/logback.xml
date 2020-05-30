@@ -3,9 +3,7 @@
     <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
         <!-- encoders are assigned the type
      ch.qos.logback.classic.encoder.PatternLayoutEncoder by default -->
-        <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
-            <level>"${stdout.appender.level:-info}"</level>
-        </filter>
+
         <encoder>
             <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
         </encoder>
@@ -13,25 +11,18 @@
 
     <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
         <file>output/logFile.log</file>
-        <filter class="com.actimize.automation.infra.reporter.DefaultFilter" />
-        <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
-            <level>"${file.appender.level:-info}"</level>
-        </filter>
-        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
-
-            <!-- daily rollover -->
-            <fileNamePattern>output/logFile.%d{yyyy-MM-dd}.log</fileNamePattern>
-
-            <!-- keep 1 days' worth of history -->
-            <maxHistory>20</maxHistory>
-        </rollingPolicy>
 
         <encoder>
             <pattern>%d{HH:mm:ss.SSS}  %-4relative [%thread] %-5level %logger{35} - %msg%n</pattern>
         </encoder>
     </appender>
 
-    <root level="info" additivity="false">
+
+
+
+    <logger name="ch.qos.logback.classic" level="warn"/>
+
+    <root level="debug" additivity="false">
         <appender-ref ref="STDOUT"/>
         <appender-ref ref="FILE"/>
     </root>

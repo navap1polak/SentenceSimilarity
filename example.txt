@@ -1,0 +1,9 @@
+01-02-2012 20:12:39 Nira is going to the grocery
+02-01-2012 20:12:39 Mike is making dinner
+01-01-2012 20:12:38 Ido is making dinner
+01-01-2012 20:12:37 Mari is doing homework
+01-01-2012 20:12:36 Shira is going to the grocery
+01-01-2012 20:12:35 Rina is making dinner
+01-01-2012 20:12:34 Ishay is doing something
+01-01-2012 20:12:33 Lea is doing something
+01-01-2012 20:12:32 Lea is making something

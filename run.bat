@@ -1,0 +1,1 @@
+java -cp lib\* nava.polak.onik.PatternSimilarity example.txt examples_output.txt

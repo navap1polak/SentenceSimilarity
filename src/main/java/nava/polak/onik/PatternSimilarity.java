@@ -19,48 +19,87 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
+/**
+ * This class finds the similarity between sentences and aggregate the results.
+ * The algorithm to find similarity is run over all sentences and save the founded words into row indexes.
+ * The sentences should be in format: [name] is [action] [doing something]. For example: Neta is eating an apple.
+ * In order to run initiate constructor with input file path and out file path to create.
+ *              PatternSimilarity patternSimilarity = new PatternSimilarity(input_file,output_file);
+ *               patternSimilarity.findSentensesWith1Differnce();
+ * There is test coverage in the test part
+ */
 @Slf4j
 public class PatternSimilarity {
+
+    /**
+     * regular expression to match with each sentence
+     */
     private static final String patternStr = "(\\d\\d-\\d\\d-\\d\\d\\d\\d \\d\\d:\\d\\d:\\d\\d) ([^\\s]+) is ([^\\s]+) (.*)";
+
     private final Pattern pattern;
-    private final String outputFile;
-    private final String inputFile;
+    private final String outputFilePath;
+    private final String inputFilePath;
 
-    List<Record> sentences = new ArrayList<>();
+    /**
+     * Store all sentences read from file
+     */
+    private List<Record> sentences = new ArrayList<>();
 
+    /**
+     * Store sentences not according expected pattern
+     */
     @Getter
     private final List<String> sentencesNotAccordingPattern = new ArrayList<>();
 
-
+    /**
+     * Store all the names in sentences mapped to the index in sentences array
+     */
     private final KeyToSetMap<String,Integer> nameToIndexMap = new KeyToSetMap();
+
+    /**
+     * Store all the actions in sentences mapped to the index in sentences array
+     */
     private final KeyToSetMap<String,Integer> actionToIndexMap = new KeyToSetMap();
+
+    /**
+     * Store all the rest in sentences mapped to the index in sentences array
+     */
     private final KeyToSetMap<String,Integer> restToIndexMap = new KeyToSetMap();
 
+    /**
+     * store the reults of similar sentences
+     * The key is string concatenations of the 2 parts which are identical.
+     * The value is the sentence index in sentences array where this combination exists.
+     */
     HashMap<String, ResultsPerType> keyToResults  = new HashMap<>();
 
 
-    public PatternSimilarity(String inputFile, String outputFile) {
-        this.inputFile = inputFile;
-        this.outputFile = outputFile;
+
+
+    public PatternSimilarity(String inputFilePath, String outputFilePath) {
+        this.inputFilePath = inputFilePath;
+        this.outputFilePath = outputFilePath;
         this.pattern = Pattern.compile(patternStr);
     }
 
     public void printResults(){
 
-        try (BufferedWriter bf = new BufferedWriter(new FileWriter(outputFile))) {
+        try (BufferedWriter bf = new BufferedWriter(new FileWriter(outputFilePath))) {
             keyToResults.values().stream().forEach(v->{
                 try {
                     bf.write( v.getRecordsStr(sentences));
                     bf.newLine();
                     bf.flush();
                 } catch (IOException e) {
-                   log.error("Got error while writint record",e);
+                   log.error("Got error while writing record",e);
                 }
 
             });
 
             if(keyToResults.isEmpty())
                 log.warn("No match was found");
+            else
+                log.debug("Sentence similarity written into  " + outputFilePath);
 
         }catch(Exception e){
             throw new RuntimeException("Got error while writing results into file",e);
@@ -76,20 +115,24 @@ public class PatternSimilarity {
         }
     }
 
-    public void findSentences1DifferenceAndPrint(){
-        findSentensesWith1Differnce();
+    public void findSentencesSingleDifferenceAndPrint(){
+        findSentensesWithSingleDifference();
         printResults();
     }
 
 
     @VisibleForTesting
-    public HashMap<String, ResultsPerType> findSentensesWith1Differnce(){
+    public HashMap<String, ResultsPerType> findSentensesWithSingleDifference(){
+        //make sure the file contains any sentence
         final AtomicBoolean atLeast1Sentence = new AtomicBoolean(false);
-        try (Stream<String> stream = Files.lines(Paths.get(inputFile)) ) {
+        log.debug("Processing sentences from " + inputFilePath);
+        //go over sentences from file
+        try (Stream<String> stream = Files.lines(Paths.get(inputFilePath)) ) {
             stream.forEach(s-> {
                 atLeast1Sentence.set(true);
                 Record currRecord = null;
                 try {
+                    //match to pattern and save the parts
                     Matcher matcher = pattern.matcher(s.trim());
                     if(matcher.find()) {
                         currRecord = new Record(matcher.group(1),
@@ -106,6 +149,7 @@ public class PatternSimilarity {
                     sentencesNotAccordingPattern.add(s);
                 }
                 if(currRecord != null)
+                    //analyze each record against indexed data
                     handleRecord(currRecord);
 
             });
@@ -116,21 +160,28 @@ public class PatternSimilarity {
 
         if(!atLeast1Sentence.get())
             log.warn("The input file is empty. No records exists");
+        else
+            log.debug("Finished processing sentences");
 
         return keyToResults;
     }
 
+    /**
+     * analyze each record against indexed data
+     * @param currRecord
+     */
     private void handleRecord(Record currRecord) {
+        //save the data
         sentences.add(currRecord);
+
         int index = sentences.size() - 1;
 
-        //take name and try to find same name with same action
+        //get indexed data for each part of the sentence
         Set<Integer> sentencesWithThisName = nameToIndexMap.get(currRecord.getName());
         Set<Integer> sentensesWithThisAction = actionToIndexMap.get(currRecord.getAction());
         Set<Integer> sentensesWithThisRst = restToIndexMap.get(currRecord.getRestStr());
-        boolean foundAction = false;
 
-        //try to find same name with same action
+        //try to find records with same name, same action
         checkThirdPartAmongIdentical2Parts(currRecord,
                 sentencesWithThisName,
                 sentensesWithThisAction,
@@ -139,7 +190,7 @@ public class PatternSimilarity {
                 index
         );
 
-        //try to find same action with same restStr
+        //try to find records with same action, same restStr
         checkThirdPartAmongIdentical2Parts(currRecord,
                 sentensesWithThisAction,
                 sentensesWithThisRst,
@@ -147,7 +198,7 @@ public class PatternSimilarity {
                 PatternType.NAME,
                 index);
 
-        //try to find same action with same restStr
+        //try to find records with same action, same restStr
         checkThirdPartAmongIdentical2Parts(currRecord,
                 sentencesWithThisName,
                 sentensesWithThisRst,
@@ -155,19 +206,21 @@ public class PatternSimilarity {
                 PatternType.ACTION,
                 index);
 
-
+        //save parts into indexed data
         nameToIndexMap.put(currRecord.getName(), index);
         actionToIndexMap.put(currRecord.getAction(), index);
         restToIndexMap.put(currRecord.getRestStr(), index);
     }
 
     public static void main(String[] args) {
-        if(args== null || args.length == 0){
+        if(args== null || args.length != 2){
+            System.out.println("Usage: PatternSimilarity [input file path] []output file path");
+            System.exit(-1);
 
         }
-        String fileName = args[0];
+
         PatternSimilarity patternSimilarity = new PatternSimilarity(args[0],args[1]);
-        patternSimilarity.findSentensesWith1Differnce();
+        patternSimilarity.findSentencesSingleDifferenceAndPrint();
 
     }
 
@@ -185,31 +238,37 @@ public class PatternSimilarity {
                                     Set<Integer> secondSet,
                                     String firstTestStr,
                                     PatternType type,
-    int index) {
+                                    int index) {
 
         if(firstSet == null || secondSet == null){
-            //this is the first time the word exists
-            //no match
+            //this is the first time the word exists - no match
             return;
         }
 
+        //get the intersaction - i.e. records which both words exists
         Set<Integer> intersection = new HashSet<>(firstSet);
         intersection.retainAll(secondSet);
 
-        //only in case there are lements in the intersection
+        //only in case there are elements in the intersection
         intersection.stream().forEach(i->{
             //if rest does not contains the string then,
-            //it brobably the past with singele diggerence
+            //it brobably the past with singele difference
            int otherSentIndex = i;
+
+           //get the record found is common
            Record thatRecord = sentences.get(otherSentIndex);
+
+           //this is the word which is different in that record
            String secTestStr = thatRecord.getWordAccorfingType(type);
            //in case it is not identical
            if(!firstTestStr.equals(secTestStr)){
-               //make sure the difference in words is only one
+               //make sure the difference in words is only one (actually we are saving parts)
                if(is1wordDifferent(firstTestStr,thatRecord.getWordAccorfingType(type))){
+
+                   //The key is [first identical part]_[second identical part]
                    String key = currRecord.constructKeyAccordingType(type);
                     ResultsPerType currEntry = keyToResults.get(key);
-
+                    //for first match
                     if(currEntry == null){
                         currEntry = new ResultsPerType(type);
                         keyToResults.put(key,currEntry);
@@ -220,7 +279,6 @@ public class PatternSimilarity {
            }
         });
     }
-
 
 
     private boolean is1wordDifferent(String s1, String s2) {
@@ -248,38 +306,4 @@ public class PatternSimilarity {
             }
             return (numDifrrences == 1);
         }
-
-
-    public class SimilarRecords{
-        Record firstRecord;
-        Record secondRecord;
-        PatternType type;
-
-        public SimilarRecords(Record firstRecord, Record secondRecord, PatternType type) {
-            this.firstRecord = firstRecord;
-            this.secondRecord = secondRecord;
-            this.type = type;
-        }
-
-        @Override
-        public boolean equals(Object o) {
-            if (this == o) return true;
-            if (o == null || getClass() != o.getClass()) return false;
-            SimilarRecords that = (SimilarRecords) o;
-            return Objects.equals(firstRecord, that.firstRecord) &&
-                    Objects.equals(secondRecord, that.secondRecord) &&
-                    type == that.type;
-        }
-
-        @Override
-        public int hashCode() {
-            return Objects.hash(firstRecord, secondRecord, type);
-        }
-
-
-
-
-    }
-
-
 }
